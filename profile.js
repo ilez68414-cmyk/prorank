@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, updateDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, deleteDoc } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
@@ -16,6 +16,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 let currentFighterRef = null;
+let currentFighterId = null;
 
 async function loadProfileData() {
     const params = new URLSearchParams(window.location.search);
@@ -24,8 +25,10 @@ async function loadProfileData() {
         document.getElementById('profName').innerText = 'ID не указан';
         return;
     }
+    currentFighterId = profileId;
+    currentFighterRef = doc(db, "fighters", profileId);
+    
     try {
-        currentFighterRef = doc(db, "fighters", profileId);
         const fighterSnap = await getDoc(currentFighterRef);
         if (!fighterSnap.exists()) {
             document.getElementById('profName').innerText = 'Боец не найден';
@@ -38,6 +41,9 @@ async function loadProfileData() {
         document.getElementById('profCity').innerText = fighter.city || '—';
         document.getElementById('bioText').innerText = fighter.bio || "Тут пока пусто...";
 
+        // Загружаем количество лайков
+        await loadLikesCount();
+        
         const editProfileBtn = document.getElementById('editProfileBtn');
         const editBioBtn = document.getElementById('editBtn');
         const saveBioBtn = document.getElementById('saveBtn');
@@ -45,7 +51,7 @@ async function loadProfileData() {
         const bioInput = document.getElementById('bioInput');
         const modal = document.getElementById('editProfileModal');
 
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
             const isOwner = user && user.uid === profileId;
             if (isOwner) {
                 if (editProfileBtn) editProfileBtn.classList.remove('hidden');
@@ -55,6 +61,18 @@ async function loadProfileData() {
             } else {
                 if (editProfileBtn) editProfileBtn.classList.add('hidden');
                 if (editBioBtn) editBioBtn.classList.add('hidden');
+            }
+            
+            // Если пользователь залогинен и это не его профиль — проверяем, ставил ли он лайк
+            if (user && !isOwner) {
+                await checkIfUserLiked(user.uid);
+            } else if (!user) {
+                // Не залогинен — кнопка лайка неактивна
+                const likeBtn = document.getElementById('likeBtn');
+                if (likeBtn) {
+                    likeBtn.disabled = true;
+                    likeBtn.title = "Войдите, чтобы поставить лайк";
+                }
             }
         });
 
@@ -79,7 +97,7 @@ async function loadProfileData() {
             };
         }
 
-        // Редактирование профиля (модальное окно)
+        // Редактирование профиля
         if (editProfileBtn) {
             editProfileBtn.onclick = () => {
                 document.getElementById('editName').value = fighter.name || '';
@@ -89,6 +107,7 @@ async function loadProfileData() {
                 modal.style.display = 'flex';
             };
         }
+        
         document.getElementById('saveProfileBtn').onclick = async () => {
             const updatedData = {
                 name: document.getElementById('editName').value,
@@ -109,6 +128,41 @@ async function loadProfileData() {
         };
     } catch (error) {
         console.error("Ошибка загрузки профиля:", error);
+    }
+}
+
+async function loadLikesCount() {
+    const likesRef = collection(db, "likes");
+    const q = query(likesRef, where("fighterId", "==", currentFighterId));
+    const snapshot = await getDocs(q);
+    const count = snapshot.size;
+    document.getElementById('likesCount').innerText = count;
+}
+
+async function checkIfUserLiked(userId) {
+    const likeDocRef = doc(db, "likes", `${userId}_${currentFighterId}`);
+    const likeSnap = await getDoc(likeDocRef);
+    const likeBtn = document.getElementById('likeBtn');
+    
+    if (likeSnap.exists()) {
+        likeBtn.classList.add('liked');
+        likeBtn.innerText = '❤️ Лайкнут';
+        likeBtn.disabled = true;
+    } else {
+        likeBtn.classList.remove('liked');
+        likeBtn.innerText = '👍 Лайк';
+        likeBtn.disabled = false;
+        likeBtn.onclick = async () => {
+            await setDoc(doc(db, "likes", `${userId}_${currentFighterId}`), {
+                fighterId: currentFighterId,
+                userId: userId,
+                createdAt: new Date()
+            });
+            likeBtn.classList.add('liked');
+            likeBtn.innerText = '❤️ Лайкнут';
+            likeBtn.disabled = true;
+            loadLikesCount();
+        };
     }
 }
 
