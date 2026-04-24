@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc, deleteDoc } from "firebase/firestore";
+import { getFirestore, doc, getDoc, updateDoc, collection, query, where, getDocs, setDoc } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
@@ -19,10 +19,15 @@ let currentFighterRef = null;
 let currentFighterId = null;
 
 async function loadProfileData() {
+    // Показываем индикатор загрузки
+    const loadingDiv = document.getElementById('profileLoading');
+    if (loadingDiv) loadingDiv.style.display = 'block';
+
     const params = new URLSearchParams(window.location.search);
     const profileId = params.get('id');
     if (!profileId) {
         document.getElementById('profName').innerText = 'ID не указан';
+        if (loadingDiv) loadingDiv.style.display = 'none';
         return;
     }
     currentFighterId = profileId;
@@ -32,6 +37,7 @@ async function loadProfileData() {
         const fighterSnap = await getDoc(currentFighterRef);
         if (!fighterSnap.exists()) {
             document.getElementById('profName').innerText = 'Боец не найден';
+            if (loadingDiv) loadingDiv.style.display = 'none';
             return;
         }
         const fighter = fighterSnap.data();
@@ -41,7 +47,7 @@ async function loadProfileData() {
         document.getElementById('profCity').innerText = fighter.city || '—';
         document.getElementById('bioText').innerText = fighter.bio || "Тут пока пусто...";
 
-        // Загружаем количество лайков
+        // Загружаем лайки
         await loadLikesCount();
         
         const editProfileBtn = document.getElementById('editProfileBtn');
@@ -63,11 +69,9 @@ async function loadProfileData() {
                 if (editBioBtn) editBioBtn.classList.add('hidden');
             }
             
-            // Если пользователь залогинен и это не его профиль — проверяем, ставил ли он лайк
             if (user && !isOwner) {
                 await checkIfUserLiked(user.uid);
             } else if (!user) {
-                // Не залогинен — кнопка лайка неактивна
                 const likeBtn = document.getElementById('likeBtn');
                 if (likeBtn) {
                     likeBtn.disabled = true;
@@ -126,8 +130,12 @@ async function loadProfileData() {
         window.onclick = (event) => {
             if (event.target === modal) modal.style.display = 'none';
         };
+        
+        // Скрываем индикатор загрузки
+        if (loadingDiv) loadingDiv.style.display = 'none';
     } catch (error) {
         console.error("Ошибка загрузки профиля:", error);
+        if (loadingDiv) loadingDiv.style.display = 'none';
     }
 }
 
@@ -136,7 +144,8 @@ async function loadLikesCount() {
     const q = query(likesRef, where("fighterId", "==", currentFighterId));
     const snapshot = await getDocs(q);
     const count = snapshot.size;
-    document.getElementById('likesCount').innerText = count;
+    const likesCountSpan = document.getElementById('likesCount');
+    if (likesCountSpan) likesCountSpan.innerText = count;
 }
 
 async function checkIfUserLiked(userId) {
@@ -166,5 +175,15 @@ async function checkIfUserLiked(userId) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', loadProfileData);
+document.addEventListener('DOMContentLoaded', () => {
+    loadProfileData();
+    // Настройка модального окна
+    const modal = document.getElementById('editProfileModal');
+    if (modal) {
+        window.addEventListener('click', (event) => {
+            if (event.target === modal) modal.style.display = 'none';
+        });
+    }
+});
+
 window.loadProfileData = loadProfileData;
