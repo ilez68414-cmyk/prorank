@@ -19,7 +19,6 @@ let currentFighterRef = null;
 let currentFighterId = null;
 
 async function loadProfileData() {
-    // Показываем индикатор загрузки
     const loadingDiv = document.getElementById('profileLoading');
     if (loadingDiv) loadingDiv.style.display = 'block';
 
@@ -41,13 +40,23 @@ async function loadProfileData() {
             return;
         }
         const fighter = fighterSnap.data();
+        
+        // Основная информация
         document.getElementById('profName').innerText = fighter.name || 'Без имени';
         document.getElementById('profSport').innerText = fighter.sport || '—';
         document.getElementById('profWeight').innerText = fighter.weight ? fighter.weight + " кг" : '—';
         document.getElementById('profCity').innerText = fighter.city || '—';
         document.getElementById('bioText').innerText = fighter.bio || "Тут пока пусто...";
-
-        // Загружаем лайки
+        
+        // Статистика
+        document.getElementById('statWins').innerText = fighter.wins || 0;
+        document.getElementById('statFinishes').innerText = fighter.finishes || 0;
+        document.getElementById('statViews').innerText = fighter.viewsLast30Days || 0;
+        document.getElementById('statSubs').innerText = fighter.subscribers || 0;
+        document.getElementById('statLastFight').innerText = fighter.lastFightDate ? fighter.lastFightDate.toDate().toLocaleDateString() : '—';
+        document.getElementById('statFRS').innerText = fighter.frs || 0;
+        
+        // Лайки
         await loadLikesCount();
         
         const editProfileBtn = document.getElementById('editProfileBtn');
@@ -131,7 +140,6 @@ async function loadProfileData() {
             if (event.target === modal) modal.style.display = 'none';
         };
         
-        // Скрываем индикатор загрузки
         if (loadingDiv) loadingDiv.style.display = 'none';
     } catch (error) {
         console.error("Ошибка загрузки профиля:", error);
@@ -143,9 +151,8 @@ async function loadLikesCount() {
     const likesRef = collection(db, "likes");
     const q = query(likesRef, where("fighterId", "==", currentFighterId));
     const snapshot = await getDocs(q);
-    const count = snapshot.size;
     const likesCountSpan = document.getElementById('likesCount');
-    if (likesCountSpan) likesCountSpan.innerText = count;
+    if (likesCountSpan) likesCountSpan.innerText = snapshot.size;
 }
 
 async function checkIfUserLiked(userId) {
@@ -177,13 +184,6 @@ async function checkIfUserLiked(userId) {
 
 document.addEventListener('DOMContentLoaded', () => {
     loadProfileData();
-    // Настройка модального окна
-    const modal = document.getElementById('editProfileModal');
-    if (modal) {
-        window.addEventListener('click', (event) => {
-            if (event.target === modal) modal.style.display = 'none';
-        });
-    }
 });
 
 window.loadProfileData = loadProfileData;
