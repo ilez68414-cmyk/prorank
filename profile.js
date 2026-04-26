@@ -73,7 +73,15 @@ async function loadProfileData() {
                 if (editBioBtn) editBioBtn.classList.remove('hidden');
                 document.getElementById('btnChallenge')?.classList.add('hidden');
                 document.getElementById('btnMessage')?.classList.add('hidden');
-            } else {
+            }// Кнопка "Подтвердить рекорд"
+            const verifyBtn = document.getElementById('verifyRecordBtn');
+             if (verifyBtn && auth.currentUser && auth.currentUser.uid === profileId) {
+                verifyBtn.classList.remove('hidden');
+              verifyBtn.onclick = () => {
+              window.open(`https://t.me/ProRankBot?start=verify_${profileId}`, '_blank');
+           };
+            }
+             else {
                 if (editProfileBtn) editProfileBtn.classList.add('hidden');
                 if (editBioBtn) editBioBtn.classList.add('hidden');
             }
